@@ -8,14 +8,16 @@ import (
     "gorm.io/gorm"
 	"github.com/joho/godotenv"
 	"schedvault/models" 
+	"path/filepath"
 )
 
 var DB *gorm.DB
 
 func ConnectDatabase() {
-    err := godotenv.Load()
+	env_path, _ := filepath.Abs("../.env")
+	err := godotenv.Load(env_path)
 	if err != nil {
-		panic("Error loading .env file")
+		panic(fmt.Sprintf("Error loading .env file: %v", err))
 	}
 
 	host := os.Getenv("DB_HOST")
