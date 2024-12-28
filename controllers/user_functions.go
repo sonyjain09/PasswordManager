@@ -76,13 +76,13 @@ func LoginUser(c *gin.Context) {
 		"user_id": user.ID,
 		"exp":     time.Now().Add(time.Hour * 72).Unix(),
 	})
-	token_string, err := token.SignedString([]byte("your-secret-key"))
+	
+	tokenString, err := token.SignedString([]byte(jwt_secret))
 	if err != nil {
 		fmt.Printf("Error generating token: %v\n", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
 	}
 
-	// set success status
-	c.JSON(http.StatusOK, gin.H{"token": token_string})
+	c.JSON(http.StatusOK, gin.H{"token": tokenString})
 }
