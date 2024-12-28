@@ -1,5 +1,9 @@
 package models
 
+import (
+	"time"
+)
+
 type User struct {
     ID       uint   
     Email    string 
@@ -19,4 +23,24 @@ type Event struct {
     Title     string
     StartTime string 
     EndTime   string 
+}
+
+type PasswordRecord struct {
+    ID          uint
+    VaultID     uint   
+    Name        string  
+    Username    string 
+    EncryptedPassword string 
+    CreatedAt   time.Time
+    UpdatedAt   time.Time
+}
+
+type RegisterInput struct {
+	Email    string 
+	Password string 
+}
+
+type LoginInput struct {
+	Email    string 
+	Password string 
 }

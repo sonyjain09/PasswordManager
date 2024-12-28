@@ -6,20 +6,19 @@ import (
 
     "gorm.io/driver/postgres"
     "gorm.io/gorm"
-	"github.com/joho/godotenv"
 	"schedvault/models" 
-	"path/filepath"
+
+	"schedvault/util"
 )
 
+// database instance
 var DB *gorm.DB
 
-func ConnectDatabase() {
-	env_path, _ := filepath.Abs("../.env")
-	err := godotenv.Load(env_path)
-	if err != nil {
-		panic(fmt.Sprintf("Error loading .env file: %v", err))
-	}
+func init() {
+	util.InitEnv()
+}
 
+func ConnectDatabase() {
 	host := os.Getenv("DB_HOST")
 	user := os.Getenv("DB_USER")
 	password := os.Getenv("DB_PASSWORD")
@@ -27,11 +26,16 @@ func ConnectDatabase() {
 	port := os.Getenv("DB_PORT")
 	sslmode := os.Getenv("DB_SSLMODE")
 
+	// connect to database with correct arguments
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s", host, user, password, dbname, port, sslmode)
     database, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
     if err != nil {
         panic("Failed to connect to database!")
     }
-    database.AutoMigrate(&models.User{}, &models.Vault{}, &models.Event{})
+
+	//  create database tables based on the struct definitions
+    database.AutoMigrate(&models.User{}, &models.Vault{}, &models.Event{}, &models.PasswordRecord{})
+
+	// set global variable
     DB = database
 }
