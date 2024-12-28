@@ -9,6 +9,8 @@ import (
 	"os"
 	"schedvault/models"
 	"google.golang.org/api/calendar/v3"
+	"time"
+
 )
 
 var GoogleOauthConfig *oauth2.Config
@@ -51,9 +53,21 @@ func GetAuthURL() string {
 
 
 func ExchangeCodeForToken(code string) (*oauth2.Token, error) {
-	ctx := context.Background()
-	return GoogleOauthConfig.Exchange(ctx, code)
+	if GoogleOauthConfig == nil {
+		return nil, fmt.Errorf("Google OAuth configuration is not initialized")
+	}
+
+	// Exchange the code for a token
+	token, err := GoogleOauthConfig.Exchange(context.Background(), code)
+	if err != nil {
+		fmt.Printf("Error exchanging code for token: %v\n", err)
+		return nil, fmt.Errorf("Failed to exchange authorization code: %v", err)
+	}
+
+	fmt.Printf("Token successfully exchanged: %+v\n", token)
+	return token, nil
 }
+
 
 func SaveTokenToDB(userID uint, token *oauth2.Token) error {
 	// Create a new GoogleToken instance
@@ -94,31 +108,34 @@ func GetTokenFromDB(userID uint) (*oauth2.Token, error) {
 	return token, nil
 }
 
-func ListCalendarEvents(token *oauth2.Token) {
+func FetchGoogleCalendarEvents(token *oauth2.Token) ([]*calendar.Event, error) {
+	// Create an authenticated HTTP client using the token
 	ctx := context.Background()
 	client := GoogleOauthConfig.Client(ctx, token)
 
+	// Create a Google Calendar service
 	srv, err := calendar.New(client)
 	if err != nil {
-		fmt.Printf("Unable to create Calendar client: %v\n", err)
-		return
+		return nil, fmt.Errorf("Unable to create Calendar client: %v", err)
 	}
 
-	// Fetch upcoming events from the primary calendar
-	events, err := srv.Events.List("primary").MaxResults(10).Do()
+	// Define the time range (e.g., now to 1 month ahead)
+	now := time.Now().Format(time.RFC3339)
+	oneMonthAhead := time.Now().AddDate(0, 1, 0).Format(time.RFC3339)
+
+	// Fetch events from the primary calendar
+	events, err := srv.Events.List("primary").
+		ShowDeleted(false).
+		SingleEvents(true).
+		TimeMin(now).
+		TimeMax(oneMonthAhead).
+		OrderBy("startTime").
+		MaxResults(50).
+		Do()
 	if err != nil {
-		fmt.Printf("Unable to retrieve calendar events: %v\n", err)
-		return
+		return nil, fmt.Errorf("Unable to retrieve calendar events: %v", err)
 	}
 
-	// Print upcoming events
-	fmt.Println("Upcoming events:")
-	for _, item := range events.Items {
-		// Handle missing DateTime gracefully
-		start := item.Start.DateTime
-		if start == "" {
-			start = item.Start.Date // All-day events may use Date instead
-		}
-		fmt.Printf("%s: %s\n", item.Summary, start)
-	}
+	return events.Items, nil
 }
+

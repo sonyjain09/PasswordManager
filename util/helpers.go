@@ -14,3 +14,4 @@ func InitEnv() {
 		panic(fmt.Sprintf("Error loading .env file: %v", err))
 	}
 }
+

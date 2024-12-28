@@ -6,8 +6,9 @@ import (
 	"schedvault/models"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 	"fmt"
+	"golang.org/x/oauth2"
+	"time"
 )
 
 func DefineAvailability(c *gin.Context) {
@@ -51,50 +52,72 @@ func GetAvailability(c *gin.Context) {
 
 
 func BookSlot(c *gin.Context) {
-	// bind JSON request to booking input struct
 	var input models.BookingInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 		return
 	}
 
-	// get the user_id from the context
-	user_id := getUserID(c)
-
-	// checks for overlapping bookings for the same user_id
-	var existing_booking models.Booking
-	if err := config.DB.Where("start_time < ? AND end_time > ?", input.EndTime, input.StartTime).
-		Where("user_id = ?", user_id). 
-		First(&existing_booking).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			fmt.Println("No overlapping booking found")
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error checking for booking conflicts"})
-			return
-		}
-	} else {
-		fmt.Printf("Overlapping booking found: %+v\n", existing_booking)
-		c.JSON(http.StatusConflict, gin.H{"error": "Time slot already booked"})
+	// Retrieve the user ID from the context
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
 
-	// if no overlapping booking create new struct to add to database
+	// Check for overlapping slots in the database
+	var existingBooking models.Booking
+	if err := config.DB.Where("start_time < ? AND end_time > ?", input.EndTime, input.StartTime).
+		Where("user_id = ?", userID).
+		First(&existingBooking).Error; err == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "Time slot already booked in the system"})
+		return
+	}
+
+	// Retrieve the user's token from the database
+	var token models.GoogleToken
+	if err := config.DB.Where("user_id = ?", userID).First(&token).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve Google token"})
+		return
+	}
+
+	// Fetch Google Calendar events
+	oauthToken := &oauth2.Token{
+		AccessToken: token.AccessToken,
+		TokenType:   token.TokenType,
+		Expiry:      token.Expiry,
+	}
+	googleEvents, err := config.FetchGoogleCalendarEvents(oauthToken)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch Google Calendar events"})
+		return
+	}
+
+	// Check for overlaps with Google Calendar events
+	for _, event := range googleEvents {
+		eventStart, _ := time.Parse(time.RFC3339, event.Start.DateTime)
+		eventEnd, _ := time.Parse(time.RFC3339, event.End.DateTime)
+
+		if eventStart.Before(input.EndTime) && eventEnd.After(input.StartTime) {
+			c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("Time slot conflicts with Google Calendar event: %s", event.Summary)})
+			return
+		}
+	}
+
+	// Create the booking
 	booking := models.Booking{
-		UserID:       user_id,
+		UserID:       userID.(uint),
 		StartTime:    input.StartTime,
 		EndTime:      input.EndTime,
 		BookedBy:     input.BookedBy,
 		BookedByEmail: input.BookedByEmail,
 	}
 
-	// save booking to database
 	if err := config.DB.Create(&booking).Error; err != nil {
-		fmt.Printf("Error creating booking: %v\n", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create booking"})
 		return
 	}
 
-	// set success status
 	c.JSON(http.StatusOK, gin.H{"message": "Booking created successfully"})
 }
 

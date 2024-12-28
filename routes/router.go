@@ -5,6 +5,7 @@ import (
 	"schedvault/middleware"
 	"schedvault/config"
 	"net/http"
+	"fmt"
 
 	"github.com/gin-gonic/gin"
 
@@ -31,34 +32,44 @@ func SetupRouter() *gin.Engine {
 	})
 
 	r.GET("/oauth2callback", func(c *gin.Context) {
+		// Retrieve the authorization code from the query string
 		code := c.Query("code")
 		if code == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Code not found"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Authorization code not provided"})
 			return
 		}
 	
+		// Exchange the code for a token
 		token, err := config.ExchangeCodeForToken(code)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to exchange token"})
-			return
-		}
-	
-		// Get the logged-in user (assuming you have user info in the session or context)
-		userID, exists := c.Get("user_id")
-		if !exists {
+			fmt.Printf("Error exchanging token: %v\n", err)
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 			return
 		}
 	
-		// Save the token to the database
-		err = config.SaveTokenToDB(userID.(uint), token)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save token"})
-			return
+		// Debugging token
+		fmt.Printf("Received Token: %+v\n", token)
+	
+		// Optionally associate with the logged-in user
+		var userID uint
+		if userIDRaw, exists := c.Get("user_id"); exists {
+			userID = userIDRaw.(uint) // Safely cast to uint
+			fmt.Printf("Associating token with user_id: %d\n", userID)
+	
+			// Save token in the database for the user
+			err = config.SaveTokenToDB(userID, token)
+			if err != nil {
+				fmt.Printf("Error saving token to DB: %v\n", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save token"})
+				return
+			}
+		} else {
+			fmt.Println("No user_id found in context; skipping association")
 		}
 	
+		// Respond to the client
 		c.JSON(http.StatusOK, gin.H{"message": "Authentication successful", "token": token})
-	})
+	})	
 	
 
 	// Create a route group for all endpoints under the /protected prefix.
