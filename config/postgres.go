@@ -34,7 +34,7 @@ func ConnectDatabase() {
     }
 
 	//  create database tables based on the struct definitions
-    database.AutoMigrate(&models.User{}, &models.Vault{}, &models.Event{}, &models.PasswordRecord{})
+    database.AutoMigrate(&models.User{}, &models.Availability{}, &models.Booking{})
 
 	// set global variable
     DB = database

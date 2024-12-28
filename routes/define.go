@@ -23,6 +23,11 @@ func SetupRouter() *gin.Engine {
 	// only authenticated requests with a valid JWT token can access these endpoints.
 	protected.Use(middleware.AuthMiddleware())
 	{	
+		protected.POST("/availability", controllers.DefineAvailability) // Define availability
+		protected.GET("/availability", controllers.GetAvailability)     // Get availability
+		protected.POST("/book", controllers.BookSlot) // Book a time slot
+		protected.GET("/bookings", controllers.GetBookings) // Get booked slots
+
 		// Defines a GET endpoint at /protected/profile
 		protected.GET("/profile", func(c *gin.Context) {
 			// send an OK response
