@@ -16,7 +16,15 @@ func main() {
 
 	// Connect to the database
 	config.ConnectDatabase()
-	fmt.Println("Database connected successfully!")
+
+	// Initialize Google OAuth configuration
+	config.InitGoogleAuth()
+
+	// Verify initialization
+	if config.GoogleOauthConfig == nil {
+		fmt.Println("Failed to initialize Google OAuth configuration. Exiting.")
+		return
+	}
 
 	// Set up the router with all routes
 	router := routes.SetupRouter()
@@ -26,3 +34,4 @@ func main() {
 		fmt.Println("Failed to start server:", err)
 	}
 }
+

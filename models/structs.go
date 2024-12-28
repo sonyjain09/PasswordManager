@@ -47,3 +47,14 @@ type BookingInput struct {
 	BookedBy     string    `json:"booked_by" binding:"required"`
 	BookedByEmail string   `json:"booked_by_email" binding:"required"`
 }
+
+type GoogleToken struct {
+	ID           uint      `gorm:"primaryKey"`
+	UserID       uint      `gorm:"not null"`
+	AccessToken  string    `gorm:"not null"`
+	RefreshToken string    `gorm:"not null"`
+	TokenType    string    `gorm:"not null"`
+	Expiry       time.Time `gorm:"not null"`
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
